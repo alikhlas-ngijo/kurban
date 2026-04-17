@@ -94,8 +94,10 @@
 <script src="js/auth.js"></script>
 <script>
     (function() {
+        // Cek apakah auth.js terbaca
         if (typeof requireAuth === 'undefined') {
-            alert('auth.js tidak dimuat. Periksa path js/');
+            alert('ERROR: auth.js tidak terload. Pastikan folder "js" berisi config.js, api.js, auth.js');
+            window.location.href = 'index.html';
             return;
         }
         // Hanya role rt yang diizinkan
@@ -118,7 +120,7 @@
     function showInfo(msg) {
         document.getElementById('mainContent').innerHTML = `<div class="alert alert-info">${msg}</div>`;
     }
-    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[m])); }
+    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => ({ '&':'&amp;', '<':'&lt;', '&gt;':'&gt;' }[m])); }
 
     async function handleUnauthorized(res) {
         if (res && (res.message === 'Unauthorized' || res.message === 'Session invalid')) {
