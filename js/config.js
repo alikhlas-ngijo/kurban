@@ -3,7 +3,7 @@
 // ==================== WAJIB DIISI ====================
 // Ganti URL di bawah dengan URL Web App dari Apps Script Anda
 // Contoh: 'https://script.google.com/macros/s/AKfycbwXYZ123456789/exec'
-const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbw6WRMvwnrQ7IOeOuHW0uIQXLQqvKRp5vdK-igo-D5iD--dPWWaP1VCaBiwhdkdVzBi/exec';
+const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbybQJLIfD2DGHvkuRqEUDV3EylSzW9sqtRkbeVGxpyuQ2ROrjx-IWZgs-NMAB_Ove1y/exec';
 
 // ==================== VALIDASI (Tanpa Alert Mengganggu) ====================
 // Hanya log ke console, tidak menampilkan alert ke user

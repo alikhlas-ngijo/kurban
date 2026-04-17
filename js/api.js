@@ -43,7 +43,7 @@ async function apiCall(action, params = {}, needAuth = true) {
                 if (typeof value === 'object') {
                     value = JSON.stringify(value);
                 } else {
-                    value = String(value); // Pastikan string
+                    value = String(value);
                 }
                 formData.append(key, value);
                 console.log(`📦 [${action}] Param ${key}:`, value.substring(0, 50));
@@ -57,7 +57,7 @@ async function apiCall(action, params = {}, needAuth = true) {
             body: formData,
             mode: 'cors',
             credentials: 'omit',
-            redirect: 'follow'   // Penting untuk mengikuti redirect Google
+            redirect: 'follow'
         });
         
         console.log(`📡 [${action}] Response status: ${response.status}`);
@@ -71,11 +71,10 @@ async function apiCall(action, params = {}, needAuth = true) {
             responseText.trim().startsWith('<html') || 
             responseText.includes('<HTML>')) {
             console.error(`❌ [${action}] Server returned HTML.`);
-            let errorMsg = 'Server mengembalikan halaman HTML. Pastikan Web App dideploy dengan akses "Anyone" (bukan "Anyone with link").';
-            if (responseText.includes('Moved Temporarily') || responseText.includes('Redirect')) {
-                errorMsg = 'Redirect terjadi. Coba deploy ulang Web App dan pastikan akses "Anyone".';
-            }
-            throw new Error(errorMsg);
+            // Ambil judul HTML jika ada untuk informasi
+            let titleMatch = responseText.match(/<title>([^<]*)<\/title>/i);
+            let title = titleMatch ? titleMatch[1] : 'Halaman HTML';
+            throw new Error(`Server mengembalikan HTML: ${title}. Periksa URL Web App dan pastikan deployment memiliki akses "Anyone".`);
         }
         
         // Hapus prefix keamanan Google Apps Script: )]}'
@@ -111,14 +110,8 @@ async function apiCall(action, params = {}, needAuth = true) {
         return result;
     } catch (error) {
         console.error(`❌ API Error [${action}]:`, error);
-        let message = error.message;
-        if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-            message = '⛔ Gagal terhubung ke server. CORS terblokir. Pastikan Web App dideploy dengan akses "Anyone" dan gunakan Live Server atau hosting HTTPS.';
-        }
-        if (error.message.includes('Redirect') || error.message.includes('HTML')) {
-            message = '❌ Server mengembalikan redirect. Pastikan Web App dideploy dengan benar dan akses "Anyone" (bukan "Anyone with link").';
-        }
-        return { status: 'error', message: message };
+        // Kembalikan pesan error asli (tidak diubah)
+        return { status: 'error', message: error.message };
     }
 }
 
@@ -255,4 +248,4 @@ window.apiCall = apiCall;
 window.apiPublic = apiPublic;
 window.getAuthToken = getAuthToken;
 
-console.log('✅ api.js loaded (dengan perbaikan CORS dan konversi string)');
+console.log('✅ api.js loaded (error asli tanpa modifikasi pesan)');
