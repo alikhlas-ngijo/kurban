@@ -94,13 +94,11 @@
 <script src="js/auth.js"></script>
 <script>
     (function() {
-        // Cek apakah auth.js terbaca
         if (typeof requireAuth === 'undefined') {
             alert('ERROR: auth.js tidak terload. Pastikan folder "js" berisi config.js, api.js, auth.js');
             window.location.href = 'index.html';
             return;
         }
-        // Hanya role rt yang diizinkan
         if (!requireAuth(['rt'])) return;
         const user = getUser();
         if (user && user.rt) {
@@ -135,13 +133,21 @@
         const userRt = getUser().rt;
         const penerimaRes = await apiCall('getPenerimaRT', { rt: userRt });
         if (await handleUnauthorized(penerimaRes)) return;
-        const jumlahPenerima = penerimaRes.status === 'success' ? penerimaRes.data.length : 0;
+        if (penerimaRes.status !== 'success') {
+            showError(penerimaRes.message);
+            return;
+        }
+        const jumlahPenerima = penerimaRes.data.length;
+        
         const distribusiRes = await apiCall('getDistribusi');
         let statusDistribusi = 'Belum dimulai';
         if (distribusiRes.status === 'success') {
             const myDist = distribusiRes.data.find(d => String(d.rt) === String(userRt));
             if (myDist) statusDistribusi = myDist.status;
+        } else {
+            console.warn('Gagal mengambil distribusi:', distribusiRes.message);
         }
+        
         const html = `
             <div class="row g-4">
                 <div class="col-md-4"><div class="card card-stats p-3"><h6>Penerima RT ${userRt}</h6><h2>${jumlahPenerima}</h2></div></div>
@@ -156,20 +162,23 @@
         const userRt = getUser().rt;
         const res = await apiCall('getPenerimaRT', { rt: userRt });
         if (await handleUnauthorized(res)) return;
-        if (res.status !== 'success') return showError(res.message);
+        if (res.status !== 'success') {
+            showError(res.message);
+            return;
+        }
         const penerima = res.data;
         let html = `<div class="card"><div class="card-body"><h5>Daftar Penerima RT ${userRt}</h5><button class="btn btn-rt btn-sm mb-3" onclick="openPenerimaModal()">+ Tambah Penerima</button><div class="table-responsive"><table class="table table-bordered"><thead class="table-success"><tr><th>Nama</th><th>Alamat</th><th>Aksi</th></tr></thead><tbody>`;
         if (penerima.length === 0) html += '<tr><td colspan="3" class="text-center">Belum ada data</td></tr>';
         else {
             penerima.forEach(p => {
                 html += `<tr>
-                            <td>${escapeHtml(p.nama)}</td>
-                            <td>${escapeHtml(p.alamat)}</td>
-                            <td>
+                             <td>${escapeHtml(p.nama)}</td>
+                             <td>${escapeHtml(p.alamat)}</td>
+                             <td>
                                 <button class="btn btn-sm btn-warning" onclick="editPenerima('${p.id}','${escapeHtml(p.nama)}','${escapeHtml(p.alamat)}')">Edit</button>
                                 <button class="btn btn-sm btn-danger" onclick="deletePenerima('${p.id}')">Hapus</button>
-                            </td>
-                         </tr>`;
+                             </td>
+                          </tr>`;
             });
         }
         html += `</tbody></table></div></div></div>`;
@@ -218,8 +227,15 @@
         const userRt = getUser().rt;
         const res = await apiCall('getDistribusi');
         if (await handleUnauthorized(res)) return;
+        if (res.status !== 'success') {
+            showError(res.message);
+            return;
+        }
         const myDist = res.data.find(d => String(d.rt) === String(userRt));
-        if (!myDist) return showInfo(`Belum ada data distribusi untuk RT ${userRt}. Hubungi admin.`);
+        if (!myDist) {
+            showInfo(`Belum ada data distribusi untuk RT ${userRt}. Hubungi admin.`);
+            return;
+        }
         const statusBadge = myDist.status === 'Selesai' ? 'bg-success' : (myDist.status === 'Distribusi Berjalan' ? 'bg-warning' : 'bg-secondary');
         const html = `<div class="card"><div class="card-body"><h5>Distribusi RT ${userRt}</h5><p>Status: <span class="badge ${statusBadge}">${myDist.status}</span></p><button class="btn btn-rt" onclick="viewChecklist('${myDist.id}', '${userRt}')">Kelola Checklist</button></div></div>`;
         document.getElementById('mainContent').innerHTML = html;
@@ -227,8 +243,15 @@
 
     window.viewChecklist = async (idDistribusi, rt) => {
         const penerimaRes = await apiCall('getPenerimaRT', { rt });
-        if (penerimaRes.status !== 'success') return alert('Gagal ambil penerima');
+        if (penerimaRes.status !== 'success') {
+            alert('Gagal ambil penerima: ' + penerimaRes.message);
+            return;
+        }
         const distribusiRes = await apiCall('getDistribusi');
+        if (distribusiRes.status !== 'success') {
+            alert('Gagal ambil distribusi: ' + distribusiRes.message);
+            return;
+        }
         const distribusiData = distribusiRes.data.find(d => d.id === idDistribusi);
         let checklist = {};
         if (distribusiData && distribusiData.checklistJson) try { checklist = JSON.parse(distribusiData.checklistJson); } catch(e) {}
