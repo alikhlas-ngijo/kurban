@@ -1,4 +1,6 @@
-// auth.js - Manajemen Autentikasi
+// auth.js - Manajemen Autentikasi dan Session
+// Menggunakan API_BASE_URL dari config.js
+
 const STORAGE_TOKEN_KEY = 'kurban_token';
 const STORAGE_USER_KEY = 'kurban_user';
 
@@ -9,18 +11,22 @@ function getToken() {
 function setAuth(token, userData) {
     localStorage.setItem(STORAGE_TOKEN_KEY, token);
     localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(userData));
+    console.log('setAuth - token:', token.substring(0,20)+'...', 'userData:', userData);
 }
 
 function clearAuth() {
     localStorage.removeItem(STORAGE_TOKEN_KEY);
     localStorage.removeItem(STORAGE_USER_KEY);
+    console.log('clearAuth - localStorage cleared');
 }
 
 function getUser() {
     const userStr = localStorage.getItem(STORAGE_USER_KEY);
     if (!userStr) return null;
     try {
-        return JSON.parse(userStr);
+        const user = JSON.parse(userStr);
+        console.log('getUser - parsed:', user);
+        return user;
     } catch (e) {
         console.error('Gagal parse user data:', e);
         return null;
@@ -28,11 +34,14 @@ function getUser() {
 }
 
 function isLoggedIn() {
-    return getToken() !== null && getUser() !== null;
+    const loggedIn = getToken() !== null && getUser() !== null;
+    console.log('isLoggedIn:', loggedIn);
+    return loggedIn;
 }
 
 async function login(username, password) {
     if (!API_BASE_URL) {
+        console.error('API_BASE_URL tidak diset');
         return { success: false, message: 'API_BASE_URL tidak diset.' };
     }
     try {
@@ -41,17 +50,26 @@ async function login(username, password) {
         formData.append('username', username);
         formData.append('password', password);
 
+        console.log('Login request to:', url);
         const response = await fetch(url, { method: 'POST', body: formData });
+        console.log('Login response status:', response.status);
+        
         const result = await response.json();
-        console.log('Login response:', result); // Debug
+        console.log('Login response JSON:', result);
 
         if (result.status === 'success') {
+            // Normalisasi role (pastikan lowercase)
+            let role = (result.role || '').toLowerCase();
+            let rt = result.rt ? String(result.rt) : null;
+            
+            console.log('Normalized role:', role, 'rt:', rt);
+            
             setAuth(result.token, {
                 username: username,
-                role: result.role,
-                rt: result.rt || null
+                role: role,
+                rt: rt
             });
-            return { success: true, role: result.role, rt: result.rt };
+            return { success: true, role: role, rt: rt };
         } else {
             return { success: false, message: result.message || 'Login gagal' };
         }
@@ -69,7 +87,9 @@ async function logout() {
             const formData = new FormData();
             formData.append('token', token);
             await fetch(url, { method: 'POST', body: formData });
-        } catch(e) { console.warn(e); }
+        } catch(e) {
+            console.warn('Logout server error:', e);
+        }
     }
     clearAuth();
     window.location.href = 'index.html';
@@ -111,19 +131,21 @@ async function refreshToken() {
 }
 
 function requireAuth(allowedRoles = []) {
+    console.log('requireAuth called, allowedRoles:', allowedRoles);
     if (!isLoggedIn()) {
+        console.log('Not logged in, redirect to index.html');
         window.location.href = 'index.html';
         return false;
     }
     const user = getUser();
     if (!user) {
+        console.log('User data missing, redirect to index.html');
         window.location.href = 'index.html';
         return false;
     }
-    // Debug
-    console.log('requireAuth - user.role:', user.role, 'allowed:', allowedRoles);
+    console.log('Current user role:', user.role);
     if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-        // Redirect berdasarkan role yang sebenarnya
+        console.log('Role not allowed, redirecting based on role:', user.role);
         if (user.role === 'admin') {
             window.location.href = 'admin.html';
         } else if (user.role === 'rt') {
@@ -142,10 +164,12 @@ if (typeof window !== 'undefined') {
         if (isLoggedIn() && API_BASE_URL) {
             const refreshed = await refreshToken();
             if (!refreshed) {
-                console.warn('Token refresh gagal, logout...');
+                console.warn('Token refresh failed, logging out...');
                 clearAuth();
                 window.location.href = 'index.html';
             }
         }
     }, 50 * 60 * 1000);
 }
+
+console.log('✅ auth.js loaded');
