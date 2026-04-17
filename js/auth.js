@@ -1,18 +1,7 @@
-// auth.js - Manajemen Autentikasi dan Session untuk Sistem Kurban
-// Menggunakan API_BASE_URL dari config.js (dimuat sebelumnya)
-
-// ======================= KONSTANTA =======================
+// auth.js - Manajemen Autentikasi
 const STORAGE_TOKEN_KEY = 'kurban_token';
 const STORAGE_USER_KEY = 'kurban_user';
 
-// ======================= CEK DEPENDENSI =======================
-if (typeof API_BASE_URL === 'undefined') {
-    console.error('ERROR: API_BASE_URL tidak didefinisikan. Pastikan config.js dimuat sebelum auth.js');
-} else {
-    console.log('Auth.js: API_BASE_URL tersedia');
-}
-
-// ======================= FUNGSI DASAR =======================
 function getToken() {
     return localStorage.getItem(STORAGE_TOKEN_KEY);
 }
@@ -42,27 +31,20 @@ function isLoggedIn() {
     return getToken() !== null && getUser() !== null;
 }
 
-// ======================= LOGIN & LOGOUT =======================
 async function login(username, password) {
     if (!API_BASE_URL) {
-        console.error('API_BASE_URL tidak diset');
-        return { success: false, message: 'Konfigurasi API belum benar. Hubungi administrator.' };
+        return { success: false, message: 'API_BASE_URL tidak diset.' };
     }
-    
     try {
         const url = `${API_BASE_URL}?action=login`;
         const formData = new FormData();
         formData.append('username', username);
         formData.append('password', password);
-        
+
         const response = await fetch(url, { method: 'POST', body: formData });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-        
         const result = await response.json();
-        
+        console.log('Login response:', result); // Debug
+
         if (result.status === 'success') {
             setAuth(result.token, {
                 username: username,
@@ -75,7 +57,7 @@ async function login(username, password) {
         }
     } catch (error) {
         console.error('Login error:', error);
-        return { success: false, message: 'Tidak dapat terhubung ke server. Periksa koneksi dan URL API.' };
+        return { success: false, message: 'Tidak dapat terhubung ke server.' };
     }
 }
 
@@ -87,16 +69,12 @@ async function logout() {
             const formData = new FormData();
             formData.append('token', token);
             await fetch(url, { method: 'POST', body: formData });
-        } catch(e) {
-            console.warn('Logout server error:', e);
-        }
+        } catch(e) { console.warn(e); }
     }
     clearAuth();
-    // Redirect ke halaman publik (landing page)
     window.location.href = 'index.html';
 }
 
-// ======================= VALIDASI & REFRESH =======================
 async function validateToken() {
     const token = getToken();
     if (!token || !API_BASE_URL) return false;
@@ -132,21 +110,20 @@ async function refreshToken() {
     }
 }
 
-// ======================= MIDDLEWARE =======================
 function requireAuth(allowedRoles = []) {
     if (!isLoggedIn()) {
-        window.location.href = 'index.html';   // Redirect ke landing publik jika belum login
+        window.location.href = 'index.html';
         return false;
     }
-    
     const user = getUser();
     if (!user) {
         window.location.href = 'index.html';
         return false;
     }
-    
+    // Debug
+    console.log('requireAuth - user.role:', user.role, 'allowed:', allowedRoles);
     if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-        // Jika role tidak diizinkan, redirect ke halaman yang sesuai
+        // Redirect berdasarkan role yang sebenarnya
         if (user.role === 'admin') {
             window.location.href = 'admin.html';
         } else if (user.role === 'rt') {
@@ -159,20 +136,16 @@ function requireAuth(allowedRoles = []) {
     return true;
 }
 
-// ======================= AUTO REFRESH TOKEN =======================
+// Auto refresh token setiap 50 menit
 if (typeof window !== 'undefined') {
     setInterval(async () => {
         if (isLoggedIn() && API_BASE_URL) {
             const refreshed = await refreshToken();
             if (!refreshed) {
-                // Jika refresh gagal, logout otomatis (akan redirect ke index.html)
-                console.warn('Token refresh failed, logging out...');
+                console.warn('Token refresh gagal, logout...');
                 clearAuth();
                 window.location.href = 'index.html';
             }
         }
-    }, 50 * 60 * 1000); // 50 menit
+    }, 50 * 60 * 1000);
 }
-
-// ======================= EKSPOR GLOBAL =======================
-// Semua fungsi sudah tersedia global
