@@ -143,9 +143,9 @@
         if (isLoggedIn()) {
             const user = getUser();
             if (user.role === 'admin') {
-                window.location.href = 'admin.html';
+                window.location.href = '/kurban/admin.html';
             } else if (user.role === 'rt') {
-                window.location.href = 'rt.html';
+                window.location.href = '/kurban/rt.html';
             } else {
                 // Hapus token tidak valid
                 logout();
@@ -179,9 +179,9 @@
             if (result.success) {
                 // Login berhasil, redirect berdasarkan role
                 if (result.role === 'admin') {
-                    window.location.href = 'admin.html';
-                } else if (result.role === 'rt') {
-                    window.location.href = 'rt.html';
+                    window.location.href = '/kurban/admin.html';
+                } else if (result.role === '/kurban/rt') {
+                    window.location.href = '/kurban/rt.html';
                 } else {
                     // Role tidak dikenal, logout
                     logout();
