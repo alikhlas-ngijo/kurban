@@ -18,6 +18,7 @@
         .loading-spinner { display: inline-block; width: 1.5rem; height: 1.5rem; border: 3px solid #e9ecef; border-top: 3px solid #1b4d3e; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
         .user-info { margin-top: auto; padding: 15px; border-top: 1px solid #2d6a4f; }
+        .error-box { background: #f8d7da; color: #721c24; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 5px solid #dc3545; }
     </style>
 </head>
 <body>
@@ -113,12 +114,12 @@
         document.getElementById('mainContent').innerHTML = `<div class="text-center p-5"><div class="loading-spinner"></div> ${msg}</div>`;
     }
     function showError(msg) {
-        document.getElementById('mainContent').innerHTML = `<div class="alert alert-danger">${escapeHtml(msg)}</div>`;
+        document.getElementById('mainContent').innerHTML = `<div class="error-box"><i class="fas fa-exclamation-triangle"></i> <strong>Error:</strong> ${escapeHtml(msg)}</div>`;
     }
     function showInfo(msg) {
-        document.getElementById('mainContent').innerHTML = `<div class="alert alert-info">${msg}</div>`;
+        document.getElementById('mainContent').innerHTML = `<div class="alert alert-info">${escapeHtml(msg)}</div>`;
     }
-    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => ({ '&':'&amp;', '<':'&lt;', '&gt;':'&gt;' }[m])); }
+    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[m])); }
 
     async function handleUnauthorized(res) {
         if (res && (res.message === 'Unauthorized' || res.message === 'Session invalid')) {
@@ -133,11 +134,13 @@
         const userRt = getUser().rt;
         const penerimaRes = await apiCall('getPenerimaRT', { rt: userRt });
         if (await handleUnauthorized(penerimaRes)) return;
-        if (penerimaRes.status !== 'success') {
-            showError(penerimaRes.message);
-            return;
+        
+        let jumlahPenerima = 0;
+        if (penerimaRes.status === 'success') {
+            jumlahPenerima = penerimaRes.data.length;
+        } else {
+            console.error('Gagal memuat penerima:', penerimaRes.message);
         }
-        const jumlahPenerima = penerimaRes.data.length;
         
         const distribusiRes = await apiCall('getDistribusi');
         let statusDistribusi = 'Belum dimulai';
@@ -145,7 +148,7 @@
             const myDist = distribusiRes.data.find(d => String(d.rt) === String(userRt));
             if (myDist) statusDistribusi = myDist.status;
         } else {
-            console.warn('Gagal mengambil distribusi:', distribusiRes.message);
+            console.error('Gagal memuat distribusi:', distribusiRes.message);
         }
         
         const html = `
@@ -167,18 +170,19 @@
             return;
         }
         const penerima = res.data;
-        let html = `<div class="card"><div class="card-body"><h5>Daftar Penerima RT ${userRt}</h5><button class="btn btn-rt btn-sm mb-3" onclick="openPenerimaModal()">+ Tambah Penerima</button><div class="table-responsive"><table class="table table-bordered"><thead class="table-success"><tr><th>Nama</th><th>Alamat</th><th>Aksi</th></tr></thead><tbody>`;
-        if (penerima.length === 0) html += '<tr><td colspan="3" class="text-center">Belum ada data</td></tr>';
-        else {
+        let html = `<div class="card"><div class="card-body"><h5>📋 Daftar Penerima RT ${userRt}</h5><button class="btn btn-rt btn-sm mb-3" onclick="openPenerimaModal()"><i class="fas fa-plus"></i> Tambah Penerima</button><div class="table-responsive"><table class="table table-bordered"><thead class="table-success"><tr><th>Nama</th><th>Alamat</th><th>Aksi</th></tr></thead><tbody>`;
+        if (penerima.length === 0) {
+            html += '<tr><td colspan="3" class="text-center">Belum ada data penerima. Silakan tambah.</td></tr>';
+        } else {
             penerima.forEach(p => {
                 html += `<tr>
-                             <td>${escapeHtml(p.nama)}</td>
-                             <td>${escapeHtml(p.alamat)}</td>
-                             <td>
-                                <button class="btn btn-sm btn-warning" onclick="editPenerima('${p.id}','${escapeHtml(p.nama)}','${escapeHtml(p.alamat)}')">Edit</button>
-                                <button class="btn btn-sm btn-danger" onclick="deletePenerima('${p.id}')">Hapus</button>
-                             </td>
-                          </tr>`;
+                            <td>${escapeHtml(p.nama)}</td>
+                            <td>${escapeHtml(p.alamat)}</td>
+                            <td>
+                                <button class="btn btn-sm btn-warning" onclick="editPenerima('${p.id}','${escapeHtml(p.nama)}','${escapeHtml(p.alamat)}')"><i class="fas fa-edit"></i> Edit</button>
+                                <button class="btn btn-sm btn-danger" onclick="deletePenerima('${p.id}')"><i class="fas fa-trash"></i> Hapus</button>
+                            </td>
+                         </tr>`;
             });
         }
         html += `</tbody></table></div></div></div>`;
@@ -186,8 +190,9 @@
     }
 
     window.openPenerimaModal = (id = null) => {
-        if (id) document.getElementById('penerimaModalLabel').innerText = 'Edit Penerima';
-        else {
+        if (id) {
+            document.getElementById('penerimaModalLabel').innerText = 'Edit Penerima';
+        } else {
             document.getElementById('penerimaModalLabel').innerText = 'Tambah Penerima';
             document.getElementById('penerimaId').value = '';
             document.getElementById('penerimaNama').value = '';
@@ -204,8 +209,12 @@
     window.deletePenerima = async (id) => {
         if (!confirm('Hapus penerima ini?')) return;
         const res = await apiCall('deletePenerima', { id });
-        if (res.status === 'success') { alert('Terhapus'); loadPenerima(); }
-        else alert('Gagal: ' + res.message);
+        if (res.status === 'success') {
+            alert('Terhapus');
+            loadPenerima();
+        } else {
+            alert('Gagal: ' + res.message);
+        }
     };
     document.getElementById('simpanPenerimaBtn').addEventListener('click', async () => {
         const id = document.getElementById('penerimaId').value;
@@ -213,13 +222,18 @@
         const alamat = document.getElementById('penerimaAlamat').value.trim();
         if (!nama || !alamat) return alert('Isi semua field');
         let res;
-        if (id) res = await apiCall('updatePenerima', { id, nama, alamat });
-        else res = await apiCall('addPenerima', { nama, alamat });
+        if (id) {
+            res = await apiCall('updatePenerima', { id, nama, alamat });
+        } else {
+            res = await apiCall('addPenerima', { nama, alamat });
+        }
         if (res.status === 'success') {
             alert(id ? 'Update berhasil' : 'Ditambahkan');
             bootstrap.Modal.getInstance(document.getElementById('penerimaModal')).hide();
             loadPenerima();
-        } else alert('Gagal: ' + res.message);
+        } else {
+            alert('Gagal: ' + res.message);
+        }
     });
 
     async function loadDistribusi() {
@@ -237,7 +251,7 @@
             return;
         }
         const statusBadge = myDist.status === 'Selesai' ? 'bg-success' : (myDist.status === 'Distribusi Berjalan' ? 'bg-warning' : 'bg-secondary');
-        const html = `<div class="card"><div class="card-body"><h5>Distribusi RT ${userRt}</h5><p>Status: <span class="badge ${statusBadge}">${myDist.status}</span></p><button class="btn btn-rt" onclick="viewChecklist('${myDist.id}', '${userRt}')">Kelola Checklist</button></div></div>`;
+        const html = `<div class="card"><div class="card-body"><h5>🚚 Distribusi RT ${userRt}</h5><p>Status: <span class="badge ${statusBadge}">${myDist.status}</span></p><button class="btn btn-rt" onclick="viewChecklist('${myDist.id}', '${userRt}')"><i class="fas fa-clipboard-list"></i> Kelola Checklist</button></div></div>`;
         document.getElementById('mainContent').innerHTML = html;
     }
 
@@ -254,19 +268,25 @@
         }
         const distribusiData = distribusiRes.data.find(d => d.id === idDistribusi);
         let checklist = {};
-        if (distribusiData && distribusiData.checklistJson) try { checklist = JSON.parse(distribusiData.checklistJson); } catch(e) {}
+        if (distribusiData && distribusiData.checklistJson) {
+            try { checklist = JSON.parse(distribusiData.checklistJson); } catch(e) { console.error(e); }
+        }
         document.getElementById('modalRtNumber').innerText = rt;
         let html = '<ul class="list-group">';
-        penerimaRes.data.forEach(p => {
-            const checked = checklist[p.id] === true;
-            html += `<li class="list-group-item d-flex justify-content-between">
-                        <div><strong>${escapeHtml(p.nama)}</strong><br><small>${escapeHtml(p.alamat)}</small></div>
-                        <div class="form-check form-switch">
-                            <input class="form-check-input penerima-check" type="checkbox" data-id="${p.id}" ${checked ? 'checked' : ''}>
-                            <label>Sudah terima</label>
-                        </div>
-                    </li>`;
-        });
+        if (penerimaRes.data.length === 0) {
+            html += '<li class="list-group-item text-muted">Belum ada penerima terdaftar untuk RT ini. Silakan tambah di menu Data Penerima.</li>';
+        } else {
+            penerimaRes.data.forEach(p => {
+                const checked = checklist[p.id] === true;
+                html += `<li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div><strong>${escapeHtml(p.nama)}</strong><br><small>${escapeHtml(p.alamat)}</small></div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input penerima-check" type="checkbox" data-id="${p.id}" ${checked ? 'checked' : ''}>
+                                <label class="form-check-label">Sudah terima</label>
+                            </div>
+                        </li>`;
+            });
+        }
         html += '</ul>';
         document.getElementById('penerimaChecklist').innerHTML = html;
         document.getElementById('statusDistribusiSelect').value = distribusiData ? distribusiData.status : 'Belum dimulai';
@@ -275,16 +295,25 @@
     };
     document.getElementById('simpanChecklistBtn').addEventListener('click', async () => {
         const checklist = {};
-        document.querySelectorAll('#penerimaChecklist .penerima-check').forEach(chk => { checklist[chk.dataset.id] = chk.checked; });
+        document.querySelectorAll('#penerimaChecklist .penerima-check').forEach(chk => {
+            checklist[chk.dataset.id] = chk.checked;
+        });
         const status = document.getElementById('statusDistribusiSelect').value;
-        const res = await apiCall('updateChecklist', { idDistribusi: window._currentDistribusiId, checklistJson: JSON.stringify(checklist), status });
+        const res = await apiCall('updateChecklist', { 
+            idDistribusi: window._currentDistribusiId, 
+            checklistJson: JSON.stringify(checklist), 
+            status 
+        });
         if (res.status === 'success') {
             alert('Checklist disimpan');
             bootstrap.Modal.getInstance(document.getElementById('distribusiModal')).hide();
             loadDistribusi();
-        } else alert('Gagal: ' + res.message);
+        } else {
+            alert('Gagal: ' + res.message);
+        }
     });
 
+    // Routing
     const pages = { dashboard: loadDashboard, penerima: loadPenerima, distribusi: loadDistribusi };
     document.querySelectorAll('.sidebar a[data-page]').forEach(link => {
         link.addEventListener('click', (e) => {
