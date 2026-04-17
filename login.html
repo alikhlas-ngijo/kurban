@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Login - Sistem Kurban Masjid Al-Ikhlas Ngijo</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'Poppins', sans-serif;
+        }
+        body {
+            background: linear-gradient(135deg, #1e3a2f 0%, #2d6a4f 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            padding: 20px;
+        }
+        .login-card {
+            max-width: 450px;
+            width: 100%;
+            border-radius: 30px;
+            overflow: hidden;
+            box-shadow: 0 20px 35px rgba(0,0,0,0.2);
+            background: white;
+            animation: fadeInUp 0.6s ease;
+        }
+        .login-header {
+            background: white;
+            padding: 30px 25px 20px;
+            text-align: center;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .login-header i {
+            font-size: 60px;
+            color: #2d6a4f;
+            margin-bottom: 15px;
+        }
+        .login-header h3 {
+            font-weight: 700;
+            color: #1e3a2f;
+            margin-bottom: 5px;
+        }
+        .login-header p {
+            color: #6c757d;
+            font-size: 14px;
+        }
+        .login-body {
+            padding: 30px 25px;
+        }
+        .form-control {
+            border-radius: 50px;
+            padding: 12px 20px;
+            border: 1px solid #ddd;
+        }
+        .form-control:focus {
+            border-color: #2d6a4f;
+            box-shadow: 0 0 0 0.2rem rgba(45,106,79,0.25);
+        }
+        .btn-login {
+            background: #2d6a4f;
+            border: none;
+            border-radius: 50px;
+            padding: 12px;
+            font-weight: 600;
+            font-size: 16px;
+            transition: 0.3s;
+        }
+        .btn-login:hover {
+            background: #1e3a2f;
+            transform: translateY(-2px);
+        }
+        .footer-note {
+            text-align: center;
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #e9ecef;
+        }
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .alert-custom {
+            border-radius: 50px;
+            font-size: 14px;
+            padding: 10px 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <div class="login-header">
+            <i class="fas fa-mosque"></i>
+            <h3>Masjid Al-Ikhlas Ngijo</h3>
+            <p>Sistem Manajemen Kurban 1447 H</p>
+        </div>
+        <div class="login-body">
+            <form id="loginForm">
+                <div class="mb-3">
+                    <label class="form-label">Username</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0"><i class="fas fa-user"></i></span>
+                        <input type="text" class="form-control border-start-0" id="username" placeholder="Masukkan username" required autofocus>
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label">Password</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0"><i class="fas fa-lock"></i></span>
+                        <input type="password" class="form-control border-start-0" id="password" placeholder="Masukkan password" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-login w-100 text-white">
+                    <i class="fas fa-sign-in-alt me-2"></i> Masuk
+                </button>
+                <div id="loginError" class="mt-3" style="min-height: 50px;"></div>
+            </form>
+            <div class="footer-note">
+                <i class="fas fa-shield-alt"></i> Akses khusus Admin & Petugas RT<br>
+                Hubungi pengurus masjid jika lupa kredensial.
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/js/config.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/auth.js"></script>
+    <script>
+        // Jika sudah login, redirect ke halaman sesuai role
+        if (isLoggedIn()) {
+            const user = getUser();
+            if (user.role === 'admin') {
+                window.location.href = 'admin.html';
+            } else if (user.role === 'rt') {
+                window.location.href = 'rt.html';
+            } else {
+                // Hapus token tidak valid
+                logout();
+            }
+        }
+
+        const form = document.getElementById('loginForm');
+        const errorDiv = document.getElementById('loginError');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Nonaktifkan tombol sementara
+            const btn = form.querySelector('button[type="submit"]');
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Memproses...';
+            
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            
+            if (!username || !password) {
+                errorDiv.innerHTML = '<div class="alert alert-danger alert-custom"><i class="fas fa-exclamation-triangle me-2"></i> Username dan password harus diisi!</div>';
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+                return;
+            }
+            
+            const result = await login(username, password);
+            
+            if (result.success) {
+                // Login berhasil, redirect berdasarkan role
+                if (result.role === 'admin') {
+                    window.location.href = 'admin.html';
+                } else if (result.role === 'rt') {
+                    window.location.href = 'rt.html';
+                } else {
+                    // Role tidak dikenal, logout
+                    logout();
+                    errorDiv.innerHTML = '<div class="alert alert-danger alert-custom"><i class="fas fa-exclamation-triangle me-2"></i> Role tidak valid.</div>';
+                }
+            } else {
+                errorDiv.innerHTML = `<div class="alert alert-danger alert-custom"><i class="fas fa-exclamation-triangle me-2"></i> ${result.message || 'Login gagal. Periksa username dan password Anda.'}</div>`;
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        });
+    </script>
+</body>
+</html>
