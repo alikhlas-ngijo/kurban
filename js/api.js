@@ -36,37 +36,46 @@ async function apiCall(action, params = {}, needAuth = true) {
             console.log(`🔐 [${action}] Token sent: ${token.substring(0, 20)}...`);
         }
         
-        // Tambahkan parameter (jangan ubah tipe data jika tidak perlu)
+        // Tambahkan parameter – konversi semua ke string untuk menghindari error 400
         for (const key in params) {
             if (params.hasOwnProperty(key) && params[key] !== undefined && params[key] !== null) {
                 let value = params[key];
-                // Jika value adalah object, stringify
                 if (typeof value === 'object') {
                     value = JSON.stringify(value);
+                } else {
+                    value = String(value); // Pastikan string
                 }
                 formData.append(key, value);
-                console.log(`📦 [${action}] Param ${key}:`, typeof value === 'string' ? value.substring(0, 50) : value);
+                console.log(`📦 [${action}] Param ${key}:`, value.substring(0, 50));
             }
         }
         
-        console.log(`🚀 [${action}] Sending request to: ${url}`);
+        console.log(`🚀 [${action}] Sending POST request to: ${url}`);
         
         const response = await fetch(url, { 
             method: 'POST', 
             body: formData,
             mode: 'cors',
-            credentials: 'omit'
+            credentials: 'omit',
+            redirect: 'follow'   // Penting untuk mengikuti redirect Google
         });
         
-        // Baca response sebagai text terlebih dahulu
-        let responseText = await response.text();
         console.log(`📡 [${action}] Response status: ${response.status}`);
-        console.log(`📄 [${action}] Raw response (first 200 chars): ${responseText.substring(0, 200)}`);
         
-        // Cek apakah respons adalah HTML (biasanya error 400/500 dari Apps Script)
-        if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
-            console.error(`❌ [${action}] Server returned HTML error page`);
-            throw new Error('Server mengembalikan halaman error. Periksa kembali URL Web App atau deploy ulang.');
+        // Baca response sebagai text
+        let responseText = await response.text();
+        console.log(`📄 [${action}] Raw response (first 300 chars): ${responseText.substring(0, 300)}`);
+        
+        // Cek apakah respons adalah HTML (error atau redirect)
+        if (responseText.trim().startsWith('<!DOCTYPE') || 
+            responseText.trim().startsWith('<html') || 
+            responseText.includes('<HTML>')) {
+            console.error(`❌ [${action}] Server returned HTML.`);
+            let errorMsg = 'Server mengembalikan halaman HTML. Pastikan Web App dideploy dengan akses "Anyone" (bukan "Anyone with link").';
+            if (responseText.includes('Moved Temporarily') || responseText.includes('Redirect')) {
+                errorMsg = 'Redirect terjadi. Coba deploy ulang Web App dan pastikan akses "Anyone".';
+            }
+            throw new Error(errorMsg);
         }
         
         // Hapus prefix keamanan Google Apps Script: )]}'
@@ -76,22 +85,13 @@ async function apiCall(action, params = {}, needAuth = true) {
             console.log(`🔧 [${action}] Removed Google security prefix`);
         }
         
-        // Coba parse JSON
+        // Parse JSON
         let result;
         try {
             result = JSON.parse(cleanText);
         } catch (e) {
             console.error(`❌ [${action}] JSON parse error:`, cleanText);
-            // Jika tidak bisa parse, coba ekstrak pesan error dari response text
-            let errorMsg = 'Respons tidak valid dari server (bukan JSON)';
-            if (cleanText.includes('"error"')) {
-                const match = cleanText.match(/"error":"([^"]+)"/);
-                if (match) errorMsg = match[1];
-            } else if (cleanText.includes('"message"')) {
-                const match = cleanText.match(/"message":"([^"]+)"/);
-                if (match) errorMsg = match[1];
-            }
-            throw new Error(errorMsg);
+            throw new Error('Respons tidak valid dari server (bukan JSON)');
         }
         
         // Jika session expired, panggil logout jika tersedia
@@ -113,13 +113,10 @@ async function apiCall(action, params = {}, needAuth = true) {
         console.error(`❌ API Error [${action}]:`, error);
         let message = error.message;
         if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-            message = '⛔ Gagal terhubung ke server. CORS terblokir. Solusi: Jalankan Chrome dengan --disable-web-security (lihat petunjuk di console).';
+            message = '⛔ Gagal terhubung ke server. CORS terblokir. Pastikan Web App dideploy dengan akses "Anyone" dan gunakan Live Server atau hosting HTTPS.';
         }
-        if (error.message.includes('HTTP 400')) {
-            message = '❌ Error 400: Request tidak valid. Cek parameter atau token.';
-        }
-        if (error.message.includes('halaman error')) {
-            message = '❌ Server error (400/500). Pastikan Web App sudah dideploy dengan benar dan akses "Anyone".';
+        if (error.message.includes('Redirect') || error.message.includes('HTML')) {
+            message = '❌ Server mengembalikan redirect. Pastikan Web App dideploy dengan benar dan akses "Anyone" (bukan "Anyone with link").';
         }
         return { status: 'error', message: message };
     }
@@ -199,10 +196,15 @@ async function getAllPenerima() {
 }
 
 async function addPenerima(nama, rt, alamat) {
-    return apiCall('addPenerima', { nama, rt: String(rt), alamat });
+    // Jika rt tidak disediakan, backend akan mengambil dari token
+    const payload = { nama, alamat };
+    if (rt) payload.rt = String(rt);
+    return apiCall('addPenerima', payload);
 }
 
 async function updatePenerima(data) {
+    // Pastikan id dan field lainnya sudah termasuk, rt opsional
+    if (data.rt) data.rt = String(data.rt);
     return apiCall('updatePenerima', data);
 }
 
@@ -251,5 +253,6 @@ window.getKelompokSapi = getKelompokSapi;
 window.getAnggotaKelompok = getAnggotaKelompok;
 window.apiCall = apiCall;
 window.apiPublic = apiPublic;
+window.getAuthToken = getAuthToken;
 
-console.log('✅ api.js loaded');
+console.log('✅ api.js loaded (dengan perbaikan CORS dan konversi string)');
